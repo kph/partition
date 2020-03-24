@@ -32,3 +32,8 @@ func TestHybrid(t *testing.T) {
 	err := Analyze("testdata/hybrid.dat")
 	fmt.Printf("Error returned is %v\n", err)
 }
+
+func TestExpart(t *testing.T) {
+	err := Analyze("testdata/expart.dat")
+	fmt.Printf("Error returned is %v\n", err)
+}

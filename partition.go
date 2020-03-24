@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -75,6 +76,28 @@ func (m *MBR) String() (s string) {
 	return
 }
 
+func (m *MBR) findEBR(f io.ReadSeeker, base int64) {
+	for i := 0; i < 4; i++ {
+		if m.Partitions[i].PartType == 0x05 {
+			offset := base + (int64(m.Partitions[i].Lba) * 512)
+			p, err := f.Seek(offset, io.SeekStart)
+			if err != nil {
+				panic(err)
+			}
+			if p != offset {
+				panic("seeked to the wrong place")
+			}
+			ebr := MBR{}
+			err = binary.Read(f, binary.LittleEndian, &ebr)
+			if err != nil {
+				panic("reading ebr")
+			}
+			fmt.Println(ebr.String())
+			ebr.findEBR(f, offset)
+		}
+	}
+}
+
 func Analyze(dev string) (err error) {
 	f, err := os.Open(dev)
 	if err != nil {
@@ -87,5 +110,6 @@ func Analyze(dev string) (err error) {
 		return &PartitionError{ErrReadingDev, err, dev}
 	}
 	fmt.Println(mbr.String())
+	mbr.findEBR(f, 0)
 	return nil
 }
