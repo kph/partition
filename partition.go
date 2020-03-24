@@ -6,19 +6,15 @@
 package partition
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
 )
 
-const (
-	blockSize = 512
-)
-
 var (
 	ErrOpeningDev = errors.New("Error opening device")
 	ErrReadingDev = errors.New("Error reading device")
-	ErrReadCount  = errors.New("Read count mismatch on device")
 )
 
 type PartitionError struct {
@@ -39,19 +35,57 @@ func (e *PartitionError) Unwrap() error {
 	return e.wrapped
 }
 
+type CHS struct {
+	Head   byte
+	Sector byte // sector in 5-0; 7-6 are high bits of cylinder
+	Cyl    byte // bits 7-0 of cylinder
+}
+
+func (c *CHS) String() string {
+	cyl := c.Cyl + ((c.Sector >> 6) << 8)
+	sector := c.Sector & 0x2f
+	return fmt.Sprintf("%d/%d/%d", cyl, c.Head, sector)
+}
+
+type PartitionEntry struct {
+	Status   byte
+	First    CHS
+	PartType byte
+	Last     CHS
+	Lba      uint32
+	Sectors  uint32
+}
+
+func (p *PartitionEntry) String() string {
+	return fmt.Sprintf("%02x %v %02x %v %d %d", p.Status, p.First, p.PartType,
+		p.Last, p.Lba, p.Sectors)
+}
+
+type MBR struct {
+	Tbd        [446]byte
+	Partitions [4]PartitionEntry
+	Signature  uint16
+}
+
+func (m *MBR) String() (s string) {
+	for i := 0; i < 4; i++ {
+		s += m.Partitions[i].String() + "\n"
+	}
+	s += fmt.Sprintf("Signature: %04x", m.Signature)
+	return
+}
+
 func Analyze(dev string) (err error) {
 	f, err := os.Open(dev)
 	if err != nil {
 		return &PartitionError{ErrOpeningDev, err, dev}
 	}
 	defer f.Close()
-	cnt, err := f.Read(make([]byte, blockSize))
+	mbr := MBR{}
+	err = binary.Read(f, binary.LittleEndian, &mbr)
 	if err != nil {
 		return &PartitionError{ErrReadingDev, err, dev}
 	}
-	if cnt != blockSize {
-		return fmt.Errorf("%w %s: expected %d got %d", ErrReadCount,
-			dev, blockSize, cnt)
-	}
+	fmt.Println(mbr.String())
 	return nil
 }

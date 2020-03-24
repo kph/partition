@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func TestAnalyze(t *testing.T) {
+func TestNonexistent(t *testing.T) {
 	err := Analyze("testdata/non-existent-file")
 	fmt.Printf("Error returned is %v\n", err)
 	fmt.Printf("Error unwrapped is %v\n", errors.Unwrap(err))
@@ -26,4 +26,9 @@ func TestAnalyze(t *testing.T) {
 	if !errors.Is(err, ErrOpeningDev) {
 		t.Error(err, "is not ErrOpeningDev")
 	}
+}
+
+func TestHybrid(t *testing.T) {
+	err := Analyze("testdata/hybrid.dat")
+	fmt.Printf("Error returned is %v\n", err)
 }
