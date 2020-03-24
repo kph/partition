@@ -22,62 +22,32 @@ var (
 )
 
 type PartitionError struct {
-	SentinelErr *sentinelError
-	Dev         string
-}
-
-type sentinelError struct {
-	e error
-	w *wrappedError
-}
-
-type wrappedError struct {
-	e error
+	sentinel error
+	wrapped  error
+	Dev      string
 }
 
 func (e *PartitionError) Error() string {
-	return fmt.Sprintf("%v %s: %v", e.SentinelErr, e.Dev, e.SentinelErr.w)
+	return fmt.Sprintf("%v %s: %v", e.sentinel, e.Dev, e.wrapped)
+}
+
+func (e *PartitionError) Is(target error) bool {
+	return target == e.sentinel
 }
 
 func (e *PartitionError) Unwrap() error {
-	return e.SentinelErr
-}
-
-func (e *sentinelError) Error() string {
-	return e.e.Error()
-}
-
-func (e *sentinelError) Is(target error) bool {
-	return target == e.e
-}
-
-func (e *sentinelError) Unwrap() error {
-	return e.w
-}
-
-func (e *wrappedError) Error() string {
-	return e.e.Error()
-}
-
-func (e *wrappedError) Unwrap() error {
-	return errors.Unwrap(e.e)
+	return e.wrapped
 }
 
 func Analyze(dev string) (err error) {
 	f, err := os.Open(dev)
 	if err != nil {
-		return &PartitionError{
-			SentinelErr: &sentinelError{ErrOpeningDev,
-				&wrappedError{err}},
-			Dev: dev}
+		return &PartitionError{ErrOpeningDev, err, dev}
 	}
 	defer f.Close()
 	cnt, err := f.Read(make([]byte, blockSize))
 	if err != nil {
-		return &PartitionError{
-			SentinelErr: &sentinelError{ErrReadingDev,
-				&wrappedError{err}},
-			Dev: dev}
+		return &PartitionError{ErrReadingDev, err, dev}
 	}
 	if cnt != blockSize {
 		return fmt.Errorf("%w %s: expected %d got %d", ErrReadCount,
