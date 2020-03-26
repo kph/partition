@@ -76,10 +76,17 @@ func (m *MBR) String() (s string) {
 	return
 }
 
-func (m *MBR) findEBR(f io.ReadSeeker, base int64) {
+func findEBR(f io.ReadSeeker, dev string, base int64) (err error) {
+	mbr := MBR{}
+	err = binary.Read(f, binary.LittleEndian, &mbr)
+	if err != nil {
+		return &PartitionError{ErrReadingDev, err, dev}
+	}
+	fmt.Println(mbr.String())
+
 	for i := 0; i < 4; i++ {
-		if m.Partitions[i].PartType == 0x05 {
-			offset := base + (int64(m.Partitions[i].Lba) * 512)
+		if mbr.Partitions[i].PartType == 0x05 {
+			offset := base + (int64(mbr.Partitions[i].Lba) * 512)
 			p, err := f.Seek(offset, io.SeekStart)
 			if err != nil {
 				panic(err)
@@ -87,15 +94,10 @@ func (m *MBR) findEBR(f io.ReadSeeker, base int64) {
 			if p != offset {
 				panic("seeked to the wrong place")
 			}
-			ebr := MBR{}
-			err = binary.Read(f, binary.LittleEndian, &ebr)
-			if err != nil {
-				panic("reading ebr")
-			}
-			fmt.Println(ebr.String())
-			ebr.findEBR(f, offset)
+			findEBR(f, dev, offset)
 		}
 	}
+	return nil
 }
 
 func Analyze(dev string) (err error) {
@@ -104,12 +106,5 @@ func Analyze(dev string) (err error) {
 		return &PartitionError{ErrOpeningDev, err, dev}
 	}
 	defer f.Close()
-	mbr := MBR{}
-	err = binary.Read(f, binary.LittleEndian, &mbr)
-	if err != nil {
-		return &PartitionError{ErrReadingDev, err, dev}
-	}
-	fmt.Println(mbr.String())
-	mbr.findEBR(f, 0)
-	return nil
+	return findEBR(f, dev, 0)
 }
