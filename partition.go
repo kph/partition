@@ -77,6 +77,13 @@ func (m *MBR) String() (s string) {
 }
 
 func findEBR(f io.ReadSeeker, dev string, base int64) (err error) {
+	p, err := f.Seek(base, io.SeekStart)
+	if err != nil {
+		panic(err)
+	}
+	if p != base {
+		panic("seeked to the wrong place")
+	}
 	mbr := MBR{}
 	err = binary.Read(f, binary.LittleEndian, &mbr)
 	if err != nil {
@@ -87,13 +94,6 @@ func findEBR(f io.ReadSeeker, dev string, base int64) (err error) {
 	for i := 0; i < 4; i++ {
 		if mbr.Partitions[i].PartType == 0x05 {
 			offset := base + (int64(mbr.Partitions[i].Lba) * 512)
-			p, err := f.Seek(offset, io.SeekStart)
-			if err != nil {
-				panic(err)
-			}
-			if p != offset {
-				panic("seeked to the wrong place")
-			}
 			findEBR(f, dev, offset)
 		}
 	}
