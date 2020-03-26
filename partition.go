@@ -14,18 +14,20 @@ import (
 )
 
 var (
-	ErrOpeningDev = errors.New("Error opening device")
-	ErrReadingDev = errors.New("Error reading device")
+	ErrOpeningDev     = errors.New("Error opening device")
+	ErrReadingDev     = errors.New("Error reading device")
+	ErrSeekingDev     = errors.New("Error seeking device")
+	ErrUnexpectedSeek = errors.New("Unexpected position seeking device")
 )
 
 type PartitionError struct {
 	sentinel error
 	wrapped  error
-	Dev      string
+	message  string
 }
 
 func (e *PartitionError) Error() string {
-	return fmt.Sprintf("%v %s: %v", e.sentinel, e.Dev, e.wrapped)
+	return e.message
 }
 
 func (e *PartitionError) Is(target error) bool {
@@ -79,15 +81,21 @@ func (m *MBR) String() (s string) {
 func findEBR(f io.ReadSeeker, dev string, base int64) (err error) {
 	p, err := f.Seek(base, io.SeekStart)
 	if err != nil {
-		panic(err)
+		return &PartitionError{ErrSeekingDev, err,
+			fmt.Sprintf("%v %s offset %d: %v",
+				ErrSeekingDev, dev, base, err)}
 	}
 	if p != base {
-		panic("seeked to the wrong place")
+		return &PartitionError{ErrUnexpectedSeek, nil,
+			fmt.Sprintf("%v %s offset %d seeked to %d instead",
+				ErrUnexpectedSeek, dev, base, p)}
 	}
 	mbr := MBR{}
 	err = binary.Read(f, binary.LittleEndian, &mbr)
 	if err != nil {
-		return &PartitionError{ErrReadingDev, err, dev}
+		return &PartitionError{ErrReadingDev, err,
+			fmt.Sprintf("%v %s offset %d: %v",
+				ErrReadingDev, dev, base, err)}
 	}
 	fmt.Println(mbr.String())
 
@@ -103,7 +111,8 @@ func findEBR(f io.ReadSeeker, dev string, base int64) (err error) {
 func Analyze(dev string) (err error) {
 	f, err := os.Open(dev)
 	if err != nil {
-		return &PartitionError{ErrOpeningDev, err, dev}
+		return &PartitionError{ErrOpeningDev, err,
+			fmt.Sprintf("%v %s: %v", ErrOpeningDev, dev, err)}
 	}
 	defer f.Close()
 	return findEBR(f, dev, 0)
