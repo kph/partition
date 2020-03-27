@@ -93,8 +93,25 @@ func (p PartitionType) String() string {
 	return fmt.Sprintf("%02x", int(p))
 }
 
+type PartitionStatus byte
+
+const (
+	PartitionStatusUnbootable = PartitionStatus(0x00)
+	PartitionStatusBootable   = PartitionStatus(0x80)
+)
+
+func (s PartitionStatus) String() string {
+	switch s {
+	case PartitionStatusUnbootable:
+		return "Unbootable"
+	case PartitionStatusBootable:
+		return "Bootable"
+	}
+	return fmt.Sprintf("Unexpected %02x", int(s))
+}
+
 type PartitionEntry struct {
-	Status  byte
+	Status  PartitionStatus
 	First   CHS
 	Type    PartitionType
 	Last    CHS
@@ -103,7 +120,7 @@ type PartitionEntry struct {
 }
 
 func (p *PartitionEntry) String() string {
-	return fmt.Sprintf("%02x %v %0v %v %d %d", p.Status, p.First, p.Type,
+	return fmt.Sprintf("%v %v %0v %v %d %d", p.Status, p.First, p.Type,
 		p.Last, p.Lba, p.Sectors)
 }
 
@@ -132,7 +149,11 @@ func (m *BootRecord) String() (s string) {
 	return
 }
 
-func findEBR(f io.ReadSeeker, dev string, base int64) (err error) {
+type PartitionTable struct {
+	Table []PartitionEntry
+}
+
+func (t *PartitionTable) ParseBootRecord(f io.ReadSeeker, dev string, base int64) (err error) {
 	p, err := f.Seek(base, io.SeekStart)
 	if err != nil {
 		return &PartitionError{ErrSeekingDev, err,
@@ -154,9 +175,22 @@ func findEBR(f io.ReadSeeker, dev string, base int64) (err error) {
 	fmt.Println(br.String())
 
 	for i := 0; i < 4; i++ {
+		if br.Partitions[i].IsUsed() && !br.Partitions[i].IsExtended() {
+			t.Table = append(t.Table, br.Partitions[i])
+		} else {
+			if base == 0 {
+				t.Table = append(t.Table, PartitionEntry{})
+			}
+		}
+	}
+
+	for i := 0; i < 4; i++ {
 		if br.Partitions[i].IsExtended() {
 			offset := base + (int64(br.Partitions[i].Lba) * 512)
-			findEBR(f, dev, offset)
+			err = t.ParseBootRecord(f, dev, offset)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -169,5 +203,12 @@ func Analyze(dev string) (err error) {
 			fmt.Sprintf("%v %s: %v", ErrOpeningDev, dev, err)}
 	}
 	defer f.Close()
-	return findEBR(f, dev, 0)
+	t := &PartitionTable{}
+	t.Table = make([]PartitionEntry, 0)
+	err = t.ParseBootRecord(f, dev, 0)
+	if err != nil {
+		return err
+	}
+	fmt.Println(t)
+	return nil
 }
