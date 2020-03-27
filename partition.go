@@ -14,10 +14,11 @@ import (
 )
 
 var (
-	ErrOpeningDev     = errors.New("Error opening device")
-	ErrReadingDev     = errors.New("Error reading device")
-	ErrSeekingDev     = errors.New("Error seeking device")
-	ErrUnexpectedSeek = errors.New("Unexpected position seeking device")
+	ErrOpeningDev       = errors.New("Error opening device")
+	ErrReadingDev       = errors.New("Error reading device")
+	ErrSeekingDev       = errors.New("Error seeking device")
+	ErrUnexpectedSeek   = errors.New("Unexpected position seeking device")
+	ErrMultipleBootable = errors.New("Multiple bootable partitions")
 )
 
 type PartitionError struct {
@@ -138,6 +139,10 @@ func (p PartitionEntry) IsUsed() bool {
 		!p.Last.IsZero() || p.Lba != 0 || p.Sectors != 0
 }
 
+func (p PartitionEntry) IsBootable() bool {
+	return p.Status == PartitionStatusBootable
+}
+
 type BootRecord struct {
 	Tbd        [446]byte
 	Partitions [4]PartitionEntry
@@ -154,6 +159,25 @@ func (m BootRecord) String() (s string) {
 
 type PartitionTable struct {
 	Table []PartitionEntry
+}
+
+func (t PartitionTable) String() (s string) {
+	for i, part := range t.Table {
+		s += fmt.Sprintf("%03d %v\n", i+1, part)
+	}
+	return s
+}
+
+func (t PartitionTable) GetBootable() (index int, err error) {
+	for i, part := range t.Table {
+		if part.IsBootable() {
+			if index != 0 {
+				return index, ErrMultipleBootable
+			}
+			index = i + 1
+		}
+	}
+	return index, nil
 }
 
 func (t *PartitionTable) ParseBootRecord(f io.ReadSeeker, dev string, base int64) (err error) {
@@ -213,10 +237,9 @@ func Analyze(dev string) (err error) {
 		return err
 	}
 	//fmt.Println(t)
-	fmt.Printf("Total partitions: %d\n", len(t.Table))
+	index, err := t.GetBootable()
+	fmt.Printf("Total partitions: %d\nBootable: %d %v\n%v", len(t.Table),
+		index, err, t)
 
-	for i, part := range t.Table {
-		fmt.Printf("%03d %v\n", i, part)
-	}
 	return nil
 }
