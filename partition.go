@@ -50,27 +50,67 @@ func (c *CHS) String() string {
 	return fmt.Sprintf("%d/%d/%d", cyl, c.Head, sector)
 }
 
+type PartitionType byte
+
+const (
+	PartitionTypeDOSExtended   = PartitionType(0x05)
+	PartitionTypeWin98Extended = PartitionType(0x0f)
+	PartitionTypeLinuxExtended = PartitionType(0x85)
+
+	PartitionTypeLinuxSwap = PartitionType(0x82)
+	PartitionTypeLinuxData = PartitionType(0x83)
+	PartitionTypeLinuxLVM  = PartitionType(0x8e)
+	PartitionTypeLinuxRAID = PartitionType(0xfd)
+)
+
+func (p PartitionType) String() string {
+	switch p {
+	case PartitionTypeDOSExtended:
+		return "DOS Extended"
+	case PartitionTypeWin98Extended:
+		return "Win98 Extended"
+	case PartitionTypeLinuxExtended:
+		return "Linux Extended"
+
+	case PartitionTypeLinuxSwap:
+		return "Linux Swap"
+	case PartitionTypeLinuxData:
+		return "Linux Data"
+	case PartitionTypeLinuxLVM:
+		return "Linux LVM"
+	case PartitionTypeLinuxRAID:
+		return "Linux RAID"
+	}
+	return fmt.Sprintf("%02x", int(p))
+}
+
 type PartitionEntry struct {
-	Status   byte
-	First    CHS
-	PartType byte
-	Last     CHS
-	Lba      uint32
-	Sectors  uint32
+	Status  byte
+	First   CHS
+	Type    PartitionType
+	Last    CHS
+	Lba     uint32
+	Sectors uint32
 }
 
 func (p *PartitionEntry) String() string {
-	return fmt.Sprintf("%02x %v %02x %v %d %d", p.Status, p.First, p.PartType,
+	return fmt.Sprintf("%02x %v %0v %v %d %d", p.Status, p.First, p.Type,
 		p.Last, p.Lba, p.Sectors)
 }
 
-type MBR struct {
+func (p *PartitionEntry) IsExtended() bool {
+	return p.Type == PartitionTypeDOSExtended ||
+		p.Type == PartitionTypeWin98Extended ||
+		p.Type == PartitionTypeLinuxExtended
+}
+
+type BootRecord struct {
 	Tbd        [446]byte
 	Partitions [4]PartitionEntry
 	Signature  uint16
 }
 
-func (m *MBR) String() (s string) {
+func (m *BootRecord) String() (s string) {
 	for i := 0; i < 4; i++ {
 		s += m.Partitions[i].String() + "\n"
 	}
@@ -90,18 +130,18 @@ func findEBR(f io.ReadSeeker, dev string, base int64) (err error) {
 			fmt.Sprintf("%v %s offset %d seeked to %d instead",
 				ErrUnexpectedSeek, dev, base, p)}
 	}
-	mbr := MBR{}
-	err = binary.Read(f, binary.LittleEndian, &mbr)
+	br := BootRecord{}
+	err = binary.Read(f, binary.LittleEndian, &br)
 	if err != nil {
 		return &PartitionError{ErrReadingDev, err,
 			fmt.Sprintf("%v %s offset %d: %v",
 				ErrReadingDev, dev, base, err)}
 	}
-	fmt.Println(mbr.String())
+	fmt.Println(br.String())
 
 	for i := 0; i < 4; i++ {
-		if mbr.Partitions[i].PartType == 0x05 {
-			offset := base + (int64(mbr.Partitions[i].Lba) * 512)
+		if br.Partitions[i].IsExtended() {
+			offset := base + (int64(br.Partitions[i].Lba) * 512)
 			findEBR(f, dev, offset)
 		}
 	}
