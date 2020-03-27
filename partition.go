@@ -50,9 +50,15 @@ func (c *CHS) String() string {
 	return fmt.Sprintf("%d/%d/%d", cyl, c.Head, sector)
 }
 
+func (c *CHS) IsZero() bool {
+	return c.Cyl == 0 && c.Head == 0 && c.Sector == 0
+}
+
 type PartitionType byte
 
 const (
+	PartitionTypeEmpty = PartitionType(0x00)
+
 	PartitionTypeDOSExtended   = PartitionType(0x05)
 	PartitionTypeWin98Extended = PartitionType(0x0f)
 	PartitionTypeLinuxExtended = PartitionType(0x85)
@@ -65,6 +71,9 @@ const (
 
 func (p PartitionType) String() string {
 	switch p {
+	case PartitionTypeEmpty:
+		return "Empty"
+
 	case PartitionTypeDOSExtended:
 		return "DOS Extended"
 	case PartitionTypeWin98Extended:
@@ -102,6 +111,11 @@ func (p *PartitionEntry) IsExtended() bool {
 	return p.Type == PartitionTypeDOSExtended ||
 		p.Type == PartitionTypeWin98Extended ||
 		p.Type == PartitionTypeLinuxExtended
+}
+
+func (p *PartitionEntry) IsUsed() bool {
+	return p.Status != 0 || !p.First.IsZero() || p.Type != PartitionTypeEmpty ||
+		!p.Last.IsZero() || p.Lba != 0 || p.Sectors != 0
 }
 
 type BootRecord struct {
