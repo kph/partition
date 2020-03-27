@@ -26,15 +26,15 @@ type PartitionError struct {
 	message  string
 }
 
-func (e *PartitionError) Error() string {
+func (e PartitionError) Error() string {
 	return e.message
 }
 
-func (e *PartitionError) Is(target error) bool {
+func (e PartitionError) Is(target error) bool {
 	return target == e.sentinel
 }
 
-func (e *PartitionError) Unwrap() error {
+func (e PartitionError) Unwrap() error {
 	return e.wrapped
 }
 
@@ -44,13 +44,13 @@ type CHS struct {
 	Cyl    byte // bits 7-0 of cylinder
 }
 
-func (c *CHS) String() string {
+func (c CHS) String() string {
 	cyl := c.Cyl + ((c.Sector >> 6) << 8)
 	sector := c.Sector & 0x2f
 	return fmt.Sprintf("%d/%d/%d", cyl, c.Head, sector)
 }
 
-func (c *CHS) IsZero() bool {
+func (c CHS) IsZero() bool {
 	return c.Cyl == 0 && c.Head == 0 && c.Sector == 0
 }
 
@@ -119,21 +119,21 @@ type PartitionEntry struct {
 	Sectors uint32
 }
 
-func (p *PartitionEntry) String() string {
+func (p PartitionEntry) String() string {
 	if p.IsUsed() {
-		return fmt.Sprintf("%v %v %0v %v %d %d", p.Status, p.First, p.Type,
+		return fmt.Sprintf("%v %v %v %v %d %d", p.Status, p.First, p.Type,
 			p.Last, p.Lba, p.Sectors)
 	}
 	return "(Empty)"
 }
 
-func (p *PartitionEntry) IsExtended() bool {
+func (p PartitionEntry) IsExtended() bool {
 	return p.Type == PartitionTypeDOSExtended ||
 		p.Type == PartitionTypeWin98Extended ||
 		p.Type == PartitionTypeLinuxExtended
 }
 
-func (p *PartitionEntry) IsUsed() bool {
+func (p PartitionEntry) IsUsed() bool {
 	return p.Status != 0 || !p.First.IsZero() || p.Type != PartitionTypeEmpty ||
 		!p.Last.IsZero() || p.Lba != 0 || p.Sectors != 0
 }
@@ -144,7 +144,7 @@ type BootRecord struct {
 	Signature  uint16
 }
 
-func (m *BootRecord) String() (s string) {
+func (m BootRecord) String() (s string) {
 	for i := 0; i < 4; i++ {
 		s += m.Partitions[i].String() + "\n"
 	}
