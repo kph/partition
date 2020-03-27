@@ -120,8 +120,11 @@ type PartitionEntry struct {
 }
 
 func (p *PartitionEntry) String() string {
-	return fmt.Sprintf("%v %v %0v %v %d %d", p.Status, p.First, p.Type,
-		p.Last, p.Lba, p.Sectors)
+	if p.IsUsed() {
+		return fmt.Sprintf("%v %v %0v %v %d %d", p.Status, p.First, p.Type,
+			p.Last, p.Lba, p.Sectors)
+	}
+	return "(Empty)"
 }
 
 func (p *PartitionEntry) IsExtended() bool {
@@ -172,7 +175,7 @@ func (t *PartitionTable) ParseBootRecord(f io.ReadSeeker, dev string, base int64
 			fmt.Sprintf("%v %s offset %d: %v",
 				ErrReadingDev, dev, base, err)}
 	}
-	fmt.Println(br.String())
+	//fmt.Println(br.String())
 
 	for i := 0; i < 4; i++ {
 		if br.Partitions[i].IsUsed() && !br.Partitions[i].IsExtended() {
@@ -209,6 +212,11 @@ func Analyze(dev string) (err error) {
 	if err != nil {
 		return err
 	}
-	fmt.Println(t)
+	//fmt.Println(t)
+	fmt.Printf("Total partitions: %d\n", len(t.Table))
+
+	for i, part := range t.Table {
+		fmt.Printf("%03d %v\n", i, part)
+	}
 	return nil
 }
