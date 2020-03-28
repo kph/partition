@@ -37,3 +37,8 @@ func TestExpart(t *testing.T) {
 	err := Analyze("testdata/expart.dat")
 	fmt.Printf("Error returned is %v\n", err)
 }
+
+func TestGPT(t *testing.T) {
+	err := Analyze("testdata/gpt.dat")
+	fmt.Printf("Error returned is %v\n", err)
+}
