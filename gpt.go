@@ -22,3 +22,12 @@ type GPTHeader struct {
 	PartitionArrayCRC  uint32
 	MBZ2               [92]byte
 }
+
+type GPTPartitonEntry struct {
+	Type     [16]byte
+	ID       [16]byte
+	FirstLBA uint64
+	LastLBA  uint64
+	Flags    uint64
+	Name     [36]uint16
+}
