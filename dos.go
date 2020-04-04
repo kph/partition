@@ -39,6 +39,8 @@ const (
 	PartitionTypeLinuxData = PartitionType(0x83)
 	PartitionTypeLinuxLVM  = PartitionType(0x8e)
 	PartitionTypeLinuxRAID = PartitionType(0xfd)
+
+	PartitionTypeGPTProtective = PartitionType(0xee)
 )
 
 func (p PartitionType) String() string {
@@ -61,6 +63,9 @@ func (p PartitionType) String() string {
 		return "Linux LVM"
 	case PartitionTypeLinuxRAID:
 		return "Linux RAID"
+
+	case PartitionTypeGPTProtective:
+		return "GPT Protective"
 	}
 	return fmt.Sprintf("%02x", int(p))
 }
@@ -112,6 +117,10 @@ func (p PartitionEntry) IsUsed() bool {
 
 func (p PartitionEntry) IsBootable() bool {
 	return p.Status == PartitionStatusBootable
+}
+
+func (p PartitionEntry) IsGPT() bool {
+	return p.Type == PartitionTypeGPTProtective
 }
 
 type BootRecord struct {
@@ -190,6 +199,17 @@ func (t *PartitionTable) ParseBootRecord(f io.ReadSeeker, dev string, base int64
 				return err
 			}
 		}
+	}
+
+	isGPT := false
+	for _, p := range t.Table {
+		if p.IsGPT() {
+			isGPT = true
+		}
+	}
+
+	if isGPT {
+		return t.ParseGPT(f, dev)
 	}
 	return nil
 }
