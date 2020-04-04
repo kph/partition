@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"unicode/utf16"
 	"unsafe"
 
 	"github.com/satori/uuid"
@@ -63,7 +64,13 @@ type GPTPartitionEntry struct {
 	FirstLBA uint64
 	LastLBA  uint64
 	Flags    uint64
-	Name     [36]uint16
+	Name     PartitionName
+}
+
+type PartitionName [36]uint16
+
+func (n PartitionName) String() string {
+	return string(utf16.Decode(((*[36]uint16)(&n))[:]))
 }
 
 func (t *PartitionTable) ParseGPT(f io.ReadSeeker, dev string) (err error) {
