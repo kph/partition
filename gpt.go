@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 	"unicode/utf16"
 	"unsafe"
 
@@ -19,24 +20,39 @@ const (
 	GPTHeaderLBA = 1 * BlockSize
 )
 
+type msuuid struct {
+	TimeLow          uint32
+	TimeMid          uint16
+	TimeHiAndVersion uint16
+	ClockSeq         [2]byte
+	Node             [6]byte
+}
+
+func (u msuuid) UUID() uuid.UUID {
+	// Abandon hope all ye who enter here
+	// https://developer.apple.com/library/archive/technotes/tn2166/_index.html#//apple_ref/doc/uid/DTS10003927-CH1-SUBSECTION11
+	u.TimeLow = binary.BigEndian.Uint32((*[4]byte)(unsafe.Pointer(&u.TimeLow))[:])
+	u.TimeMid = binary.BigEndian.Uint16((*[2]byte)(unsafe.Pointer(&u.TimeMid))[:])
+	u.TimeHiAndVersion = binary.BigEndian.Uint16((*[2]byte)(unsafe.Pointer(&u.TimeHiAndVersion))[:])
+	uuid, _ := uuid.FromBytes((*[16]byte)(unsafe.Pointer(&u))[:])
+	return uuid
+}
+func (u msuuid) String() string {
+	return u.UUID().String()
+}
+
 type GPTHeader struct {
-	Signature      [8]byte
-	MinorVer       uint16
-	MajorVer       uint16
-	HeaderSize     uint32
-	HeaderCRC      uint32
-	MBZ            uint32
-	CurrentLBA     uint64
-	BackupLBA      uint64
-	FirstUsableLBA uint64
-	LastUsableLBA  uint64
-	UUID           struct {
-		TimeLow          uint32
-		TimeMid          uint16
-		TimeHiAndVersion uint16
-		ClockSeq         [2]byte
-		Node             [6]byte
-	}
+	Signature          [8]byte
+	MinorVer           uint16
+	MajorVer           uint16
+	HeaderSize         uint32
+	HeaderCRC          uint32
+	MBZ                uint32
+	CurrentLBA         uint64
+	BackupLBA          uint64
+	FirstUsableLBA     uint64
+	LastUsableLBA      uint64
+	UUID               msuuid
 	PartitionArrayLBA  uint64
 	PartitionCount     uint32
 	PartitionEntrySize uint32
@@ -45,16 +61,10 @@ type GPTHeader struct {
 }
 
 func (g GPTHeader) String() (s string) {
-	// Abandon hope all ye who enter here
-	// https://developer.apple.com/library/archive/technotes/tn2166/_index.html#//apple_ref/doc/uid/DTS10003927-CH1-SUBSECTION11
-	g.UUID.TimeLow = binary.BigEndian.Uint32((*[4]byte)(unsafe.Pointer(&g.UUID.TimeLow))[:])
-	g.UUID.TimeMid = binary.BigEndian.Uint16((*[2]byte)(unsafe.Pointer(&g.UUID.TimeMid))[:])
-	g.UUID.TimeHiAndVersion = binary.BigEndian.Uint16((*[2]byte)(unsafe.Pointer(&g.UUID.TimeHiAndVersion))[:])
-	uuid, _ := uuid.FromBytes((*[16]byte)(unsafe.Pointer(&g.UUID))[:])
-	return fmt.Sprintf("Signature %x Ver %d.%d HeaderSize %04x HeaderCRC %04x CurrentLBA %d BackupLBA %d FirstUsableLBA %d LastUsableLBA %d UUID %s PartitionArrayLBA %d PartitionCount %d PartitionEntrySize %d PartitionArrayCRC %x",
+	return fmt.Sprintf("Signature %x Ver %d.%d HeaderSize %04x HeaderCRC %04x CurrentLBA %d BackupLBA %d FirstUsableLBA %d LastUsableLBA %d UUID %v PartitionArrayLBA %d PartitionCount %d PartitionEntrySize %d PartitionArrayCRC %x",
 		g.Signature, g.MajorVer, g.MinorVer, g.HeaderSize, g.HeaderCRC,
 		g.CurrentLBA, g.BackupLBA, g.FirstUsableLBA, g.LastUsableLBA,
-		uuid.String(), g.PartitionArrayLBA, g.PartitionCount,
+		g.UUID, g.PartitionArrayLBA, g.PartitionCount,
 		g.PartitionEntrySize, g.PartitionArrayCRC)
 }
 
@@ -70,7 +80,7 @@ type GPTPartitionEntry struct {
 type PartitionName [36]uint16
 
 func (n PartitionName) String() string {
-	return string(utf16.Decode(((*[36]uint16)(&n))[:]))
+	return strings.Trim(string(utf16.Decode(((*[36]uint16)(&n))[:])), "\x00")
 }
 
 func (t *PartitionTable) ParseGPT(f io.ReadSeeker, dev string) (err error) {
