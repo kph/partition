@@ -42,3 +42,8 @@ func TestGPT(t *testing.T) {
 	err := Analyze("testdata/gpt.dat")
 	fmt.Printf("Error returned is %v\n", err)
 }
+
+func TestGPTInvader(t *testing.T) {
+	err := Analyze("testdata/gptinvader.dat")
+	fmt.Printf("Error returned is %v\n", err)
+}
