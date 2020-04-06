@@ -28,6 +28,13 @@ type msuuid struct {
 	Node             [6]byte
 }
 
+func (u msuuid) nonZero() bool {
+	if u.TimeLow != 0 || u.TimeMid != 0 || u.TimeHiAndVersion != 0 {
+		return true
+	}
+	return false
+}
+
 func (u msuuid) UUID() uuid.UUID {
 	// Abandon hope all ye who enter here
 	// https://developer.apple.com/library/archive/technotes/tn2166/_index.html#//apple_ref/doc/uid/DTS10003927-CH1-SUBSECTION11
@@ -75,6 +82,10 @@ type GPTPartitionEntry struct {
 	LastLBA  uint64
 	Flags    uint64
 	Name     PartitionName
+}
+
+func (g GPTPartitionEntry) IsUsed() bool {
+	return g.Type.nonZero()
 }
 
 type PartitionName [36]uint16
@@ -125,7 +136,10 @@ func (t *PartitionTable) ParseGPT(f io.ReadSeeker, dev string) (err error) {
 				fmt.Sprintf("%v %s offset %d: %v",
 					ErrReadingDev, dev, offset, err)}
 		}
-		fmt.Println(part)
+		if part.IsUsed() {
+			t.GPTTable = append(t.GPTTable, part)
+		}
+		//fmt.Println(part)
 	}
 
 	return nil

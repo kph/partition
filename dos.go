@@ -137,29 +137,6 @@ func (m BootRecord) String() (s string) {
 	return
 }
 
-type PartitionTable struct {
-	Table []PartitionEntry
-}
-
-func (t PartitionTable) String() (s string) {
-	for i, part := range t.Table {
-		s += fmt.Sprintf("%03d %v\n", i+1, part)
-	}
-	return s
-}
-
-func (t PartitionTable) GetBootable() (index int, err error) {
-	for i, part := range t.Table {
-		if part.IsBootable() {
-			if index != 0 {
-				return index, ErrMultipleBootable
-			}
-			index = i + 1
-		}
-	}
-	return index, nil
-}
-
 func (t *PartitionTable) ParseBootRecord(f io.ReadSeeker, dev string, base int64) (err error) {
 	p, err := f.Seek(base, io.SeekStart)
 	if err != nil {

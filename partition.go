@@ -37,6 +37,33 @@ func (e PartitionError) Unwrap() error {
 	return e.wrapped
 }
 
+type PartitionTable struct {
+	Table    []PartitionEntry
+	GPTTable []GPTPartitionEntry
+}
+
+func (t PartitionTable) String() (s string) {
+	for i, part := range t.Table {
+		s += fmt.Sprintf("%03d %v\n", i+1, part)
+	}
+	for i, part := range t.GPTTable {
+		s += fmt.Sprintf("%03d %v\n", i+1, part)
+	}
+	return s
+}
+
+func (t PartitionTable) GetBootable() (index int, err error) {
+	for i, part := range t.Table {
+		if part.IsBootable() {
+			if index != 0 {
+				return index, ErrMultipleBootable
+			}
+			index = i + 1
+		}
+	}
+	return index, nil
+}
+
 func Analyze(dev string) (err error) {
 	f, err := os.Open(dev)
 	if err != nil {
@@ -44,8 +71,11 @@ func Analyze(dev string) (err error) {
 			fmt.Sprintf("%v %s: %v", ErrOpeningDev, dev, err)}
 	}
 	defer f.Close()
+
 	t := &PartitionTable{}
 	t.Table = make([]PartitionEntry, 0)
+	t.GPTTable = make([]GPTPartitionEntry, 0)
+
 	err = t.ParseBootRecord(f, dev, 0)
 	if err != nil {
 		return err
