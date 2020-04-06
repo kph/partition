@@ -69,8 +69,8 @@ func (g GPTHeader) String() (s string) {
 }
 
 type GPTPartitionEntry struct {
-	Type     [16]byte
-	ID       [16]byte
+	Type     msuuid
+	ID       msuuid
 	FirstLBA uint64
 	LastLBA  uint64
 	Flags    uint64
