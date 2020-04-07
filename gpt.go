@@ -20,6 +20,11 @@ const (
 	GPTHeaderLBA = 1 * BlockSize
 )
 
+var (
+	LinuxFSDataPart = uuid.Must(uuid.FromString("0FC63DAF-8483-4772-8E79-3D69D8477DE4"))
+	LinuxBootPart   = uuid.Must(uuid.FromString("BC13C2FF-59E6-4262-A352-B275FD6F7172"))
+)
+
 type msuuid struct {
 	TimeLow          uint32
 	TimeMid          uint16
